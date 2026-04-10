@@ -1,0 +1,56 @@
+from flask import Flask, render_template, request
+import time
+app = Flask(__name__)
+# ================= HOME =================
+@app.route('/')
+def home():
+return render_template('index.html', welcome=True)
+# ================= DIFFIE HELLMAN =================
+@app.route('/diffie', methods=['GET', 'POST'])
+def diffie():
+result = None
+welcome = True
+if request.method == 'POST':
+welcome = False
+time.sleep(2)
+p = int(request.form['p'])
+g = int(request.form['g'])
+a = int(request.form['a'])
+b = int(request.form['b'])
+# Public keys
+A = pow(g, a, p)
+B = pow(g, b, p)
+# Shared keys
+key1 = pow(B, a, p)
+key2 = pow(A, b, p)
+result = {
+"p": p,
+"g": g,
+"a": a,
+"b": b,
+"A": A,
+"B": B,
+"key1": key1,
+"key2": key2
+}
+return render_template('diffie.html', result=result, welcome=welcome)
+if __name__ == '__main__':
+app.run(debug=True)
+Diffie Hellman Output:
+Prime number(p) : 13
+Primitive root(g) : 5
+Private Key of A : 7
+Private Key of A : 6
+Step-by-Step Calculation:
+Step 1: Public values selected Prime (p) = 13
+Primitive Root (g) = 5
+Step 2: Private Keys Private Key A = 7
+Private Key B = 6
+Step 3: Public Keys Computation A = ga mod p
+A = 57 mod 13 = 8
+B = gb mod p
+B = 56 mod 13 = 12
+Step 4: Shared Secret Key Key₁ = Ba mod p
+Key₁ = 127 mod 13 = 12 Key₂ = Ab mod p
+Key₂ = 86 mod 13 = 12
+Final Shared Key = 12

@@ -1,0 +1,344 @@
+from flask import Flask, render_template, request, jsonify
+app = Flask(__name__)
+def permute(bits, table):
+return ''.join(bits[i 1] for i in table)
+def xor(a, b):
+return ''.join('0' if i == j else '1' for i, j in zip(a, b))
+def left_shift(bits, n):
+return bits[n:] + bits[:n]
+@app.route('/')
+def home():
+return render_template('des.html')
+@app.route('/run
+des', methods=['POST'])
+def run_des():
+data = r equest.json
+pt = data['plaintext']
+key = data['key']
+IP = data['ip']
+IP_INV = data['ipinv']
+E = data['e']
+P = data['p']
+P10 = data['p10']
+P8 = data['p8']
+s1, s2 = data['sboxes']
+steps = []
+steps. append("=========== KEY GENERATION ===========")
+steps.append(f"Original 10 bit Key: {key}")
+steps.append(f" nP10 Table: {P10}")
+key_p10 = permute(key, P10)
+steps.append(f"After P10: {key_p10}")
+left = key_p10[:5]
+right = key_p10[5:]
+steps.append(f"Left Half (5 bits): {left}")
+steps.append(f"Right Half (5 bits): {right}")
+steps.append(" n Left Shift 1 (LS 1)
+left1 = left_shift(left, 1)
+right1 = left_shift(right, 1)
+steps.append(f "Left after LS 1: {left1}")
+steps.append(f"Right after LS 1: {right1}")
+combined1 = left1 + right1
+steps.append(f"Combined after LS 1: {combined1}")
+steps.append(f" nP8 Table: {P8}")
+K1 = permute(combined1, P8)
+steps.append(f"K1 (R ound 1 Key): {K1}")
+steps.append(" n Left Shift 2 (LS 2)
+left2 = left_shift(left1, 2)
+right2 = left_shift(right1, 2)
+steps.append(f"Left after LS 2: {left2}")
+steps.append(f"Right after LS 2: {right2}")
+combined2 = left2 + right2
+steps.append(f"Combined after LSsteps.append(f"Combined after LS--2:
+{combined2}")2: {combined2}")
+K2 = permute(combined2, P8)K2 = permute(combined2, P8)
+steps.append(f"K2 (Round 2 Key): {K2}")steps.append(f"K2 (Round 2 Key): {K2}")
+steps.append("steps.append("\\nn\\n=========== INITIAL PERMUTATION
+===========")n=========== INITIAL PERMUTATION ===========")
+steps.append(f"IP Tablesteps.append(f"IP Table: {IP}"): {IP}")
+ip = permute(pt, IP)ip = permute(pt, IP)
+steps.append(f"After IP: {ip}")steps.append(f"After IP: {ip}")
+L = ip[:4]L = ip[:4]
+R = ip[4:]R = ip[4:]
+steps.append(f"L0 = {L}")steps.append(f"L0 = {L}")
+steps.append(f"R0 = {R}")steps.append(f"R0 = {R}")
+round_keys = [K1, K2, K1, K2]round_keys = [K1, K2, K1, K2]
+for rnd in range(1, 5):for rnd in range(1, 5):
+round_key = round_keys[rnd round_key = round_keys[rnd -- 1]1]
+steps.append(f"steps.append(f"\\nn\\n================ ROUND {rnd}
+================")n================ ROUND {rnd} ================")
+steps.append(f"L{rndsteps.append(f"L{rnd--1} = {L}")1} = {L}")
+steps.append(f"R{rndsteps.append(f"R{rnd--1} = {R}")1} = {R}")
+steps.append("steps.append("\\nn------ Expansion Step Expansion Step ------")")
+stepsteps.append("Expansion duplicates and reorders bits of R using E
+table")s.append("Expansion duplicates and reorders bits of R using E table")
+steps.append(f"Expansion Table (E): {E}")steps.append(f"Expansion Table (E):
+{E}")
+exp = permute(R, E)exp = permute(R, E)
+steps.append(f"Expanded R{rndsteps.append(f"Expanded R{rnd--1}: {exp}")1}:
+{exp}")
+steps.append("steps.append("\\nn------ XOR with Round Key XOR with Round Key
+------")")
+steps.append("Expanded R is XORed with current round key")steps.append("Expanded
+R is XORed with current round key")
+steps.append(f"Round Key Used: {round_key}")steps.append(f"Round Key Used:
+{round_key}")
+steps.append(f"Expanded R : {exp}")steps.append(f"Expanded R : {exp}")
+steps.append(f"Round Key : {round_key}")steps.append(f"Round Key : {round_key}")
+x = xor(exp, round_key)x = xor(exp, round_key)
+steps.asteps.append(f"XOR Result : {x}")ppend(f"XOR Result : {x}")
+steps.append("steps.append("\\nn------ SS--Box Substitution Box Substitution
+------")")
+steps.append("Split XOR result into two 4steps.append("Split XOR result into two
+4--bit halves")bit halves")
+left4 = x[:4]left4 = x[:4]
+right4 = x[4:]right4 = x[4:]
+def sbox_lookup(bits, box, name):def sbox_lookup(bits, box, name):
+row_bits = bitrow_bits = bits[0] + bits[3]s[0] + bits[3]
+col_bits = bits[1] + bits[2]col_bits = bits[1] + bits[2]
+row = int(row_bits, 2)row = int(row_bits, 2)
+col = int(col_bits, 2)col = int(col_bits, 2)
+val = box[row][col]val = box[row][col]
+out = format(val, '02b')out = format(val, '02b')
+steps.append(f"steps.append(f"\\n{name} Input: {bits}")n{name} Input: {bits}")
+steps.append(f"{name} Row Bits : {row_bits} â†’ Decimal
+{row}")steps.append(f"{name} Row Bits : {row_bits} â†’ Decimal {row}")
+steps.append(f"{name} Column Bits : {col_bits} â†’ Decimal
+{col}")steps.append(f"{name} Column Bits : {col_bits} â†’ Decimal {col}")
+steps.append(f"{name} Lookup Value: {val}")steps.append(f"{name} Lookup Value:
+{val}")
+steps.append(f"{name} Output (Binasteps.append(f"{name} Output (Binary):
+{out}")ry): {out}")
+return outreturn out
+s1_out = sbox_lookup(left4, s1, "S1")s1_out = sbox_lookup(left4, s1, "S1")
+s2_out = sbox_lookup(right4, s2, "S2")s2_out = sbox_lookup(right4, s2, "S2")
+s_out = s1_out + s2_outs_out = s1_out + s2_out
+steps.append(f"steps.append(f"\\nCombined SnCombined S--Box Output (4 bits):
+{s_out}")Box Output (4 bits): {s_out}")
+steps.append("steps.append("\\nn------ Permutation (P) Permutation (P)
+------")")
+steps.append("Rearranging Ssteps.append("Rearranging S--box output using P
+table")box output using P table")
+steps.append(f"P Table: {P}")steps.append(f"P Table: {P}")
+p_out = permute(s_out, P)p_out = permute(s_out, P)
+steps.append(f"P Output: {p_out}")steps.append(f"P Output: {p_out}")
+steps.append("steps.append("\\nn------ Feistel Function Feistel Function
+------")")
+steps.append("New Right = L XOR f(R)")steps.append("New Right = L XOR f(R)")
+steps.append(f"L{rndsteps.append(f"L{rnd--1} : {L}")1} : {L}")
+steps.append(f"f(R{rndsteps.append(f"f(R{rnd--1}) : {p_out}")1}) : {p_out}")
+new_R = xor(L, p_out)new_R = xor(L, p_out)
+steps.append(f"L{rndsteps.append(f"L{rnd--1} XOR f(R{rnd1} XOR f(R{rnd--1}) =
+{new_R}"1}) = {new_R}"))
+steps.append("steps.append("\\nn------ Swap Operation Swap Operation ------")")
+steps.append("Left and Right halves are swapped")steps.append("Left and Right
+halves are swapped")
+steps.append(f"L{rnd} = {R}")steps.append(f"L{rnd} = {R}")
+steps.append(f"R{rnd} = {new_R}")steps.append(f"R{rnd} = {new_R}")
+L, R = R, new_RL, R = R, new_R
+steps.append("steps.append("\\nn\\n=========== FINAL PERMUTATION
+===========")n=========== FINAL PERMUTATION ===========")
+steps.append(f"IP Inverse Table: {IP_INV}")steps.append(f"IP Inverse Table:
+{IP_INV}")
+preoutput = R + Lpreoutput = R + L
+steps.append(f"Preoutput (R4 + L4): {preoutput}")steps.append(f"Preoutput (R4 +
+L4): {preoutput}")
+final = permute(preoutput, IP_INV)final = permute(preoutput, IP_INV)
+steps.append(f"Final steps.append(f"Final Ciphertext: {final}")Ciphertext:
+{final}")
+return jsonify({"steps": steps})return jsonify({"steps": steps})
+
+1)DES OUTPUT
+PT:10101010
+KEY:1010000010
+P10:3,5,2,7,4,10,1,9,8,6
+P8:6,3,7,4,8,5,10,9
+IP:2,6,3,1,4,8,5,7
+IP_INV:4,1,3,5,7,2,8,6
+E:4,1,2,3,2,3,4,1
+P:2,4,3,1
+KEY GENERATION
+Original 10-bit Key: 1010000010
+P10 Table: [3, 5, 2, 7, 4, 10, 1, 9, 8, 6]
+After P10: 1000001100
+Left Half (5 bits): 10000
+Right Half (5 bits): 01100
+--- Left Shift 1 (LS-1) ---
+Left after LS-1: 00001
+Right after LS-1: 11000
+Combined after LS-1: 0000111000
+P8 Table: [6, 3, 7, 4, 8, 5, 10, 9]
+K1 (Round 1 Key): 10100100
+--- Left Shift 2 (LS-2) ---
+Left after LS-2: 00100
+Right after LS-2: 00011
+Combined after LS-2: 0010000011
+K2 (Round 2 Key): 01000011
+INITIAL PERMUTATION
+IP Table: [2, 6, 3, 1, 4, 8, 5, 7]
+After IP: 00110011
+L0 = 0011
+R0 = 0011
+ROUND 1
+L0 = 0011
+R0 = 0011
+--- Expansion Step ---
+Expansion duplicates and reorders bits of R
+using E table
+Expansion Table (E): [4, 1, 2, 3, 2, 3, 4, 1]
+Expanded R0: 10010110
+--- XOR with Round Key ---
+Expanded R is XORed with current round key
+Round Key Used: 10100100
+Expanded R : 10010110
+Round Key : 10100100
+XOR Result : 00110010
+--- S-Box Substitution ---
+Split XOR result into two 4-bit halves
+S1 Input: 0011
+S1 Row Bits : 01 → Decimal 1
+S1 Column Bits : 01 → Decimal 1
+S1 Lookup Value: 2
+S1 Output (Binary): 10
+S2 Input: 0010
+S2 Row Bits : 00 → Decimal 0
+S2 Column Bits : 01 → Decimal 1
+S2 Lookup Value: 1
+S2 Output (Binary): 01
+Combined S-Box Output (4 bits): 1001
+--- Permutation (P) ---
+Rearranging S-box output using P table
+P Table: [2, 4, 3, 1]
+P Output: 0101
+--- Feistel Function ---
+New Right = L XOR f(R)
+L0 : 0011
+f(R0) : 0101
+L0 XOR f(R0) = 0110
+--- Swap Operation ---
+Left and Right halves are swapped
+L1 = 0011
+R1 = 0110
+ROUND 2
+L1 = 0011
+R1 = 0110
+--- Expansion Step ---
+Expansion duplicates and reorders bits of R
+using E table
+Expansion Table (E): [4, 1, 2, 3, 2, 3, 4, 1]
+Expanded R1: 00111100
+--- XOR with Round Key ---
+Expanded R is XORed with current round key
+Round Key Used: 01000011
+Expanded R : 00111100
+Round Key : 01000011
+XOR Result : 01111111
+--- S-Box Substitution ---
+Split XOR result into two 4-bit halves
+S1 Input: 0111
+S1 Row Bits : 01 → Decimal 1
+S1 Column Bits : 11 → Decimal 3
+S1 Lookup Value: 0
+S1 Output (Binary): 00
+S2 Input: 1111
+S2 Row Bits : 11 → Decimal 3
+S2 Column Bits : 11 → Decimal 3
+S2 Lookup Value: 2
+S2 Output (Binary): 10
+Combined S-Box Output (4 bits): 0010
+--- Permutation (P) ---
+Rearranging S-box output using P table
+P Table: [2, 4, 3, 1]
+P Output: 0010
+New Right = L XOR f(R)
+--- Feistel Function ---
+L1 : 0011
+f(R1) : 0010
+L1 XOR f(R1) = 0001
+--- Swap Operation ---
+Left and Right halves are swapped
+L2 = 0110
+R2 = 0001
+ROUND 3
+L2 = 0110
+R2 = 0001
+--- Expansion Step ---
+Expansion duplicates and reorders bits of R
+using E table
+Expansion Table (E): [4, 1, 2, 3, 2, 3, 4, 1]
+Expanded R2: 10000010
+-- XOR with Round Key ---
+Expanded R is XORed with current round key
+Round Key Used: 10100100
+Expanded R : 10000010
+Round Key : 10100100
+XOR Result : 00100110
+--- S-Box Substitution ---
+Split XOR result into two 4-bit halves
+S1 Input: 0010
+S1 Row Bits : 00 → Decimal 0
+S1 Column Bits : 01 → Decimal 1
+S1 Lookup Value: 1
+S1 Output (Binary): 01
+S2 Input: 0110
+S2 Row Bits : 00 → Decimal 0
+S2 Column Bits : 11 → Decimal 3
+S2 Lookup Value: 3
+S2 Output (Binary): 11
+Combined S-Box Output (4 bits): 0111
+--- Permutation (P) ---
+Rearranging S-box output using P table
+P Table: [2, 4, 3, 1]
+P Output: 1110
+--- Feistel Function ---
+New Right = L XOR f(R)
+L2 : 0110
+f(R2) : 1110
+L2 XOR f(R2) = 1000
+--- Swap Operation ---
+Left and Right halves are swapped
+L3 = 0001
+R3 = 1000
+ROUND 4
+L3 = 0001
+R3 = 1000
+--- Expansion Step ---
+Expansion duplicates and reorders bits of R
+using E table
+Expansion Table (E): [4, 1, 2, 3, 2, 3, 4, 1]
+Expanded R3: 01000001
+--- XOR with Round Key ---
+Expanded R is XORed with current round key
+Round Key Used: 01000011
+Expanded R : 01000001
+Round Key : 01000011
+XOR Result : 00000010
+--- S-Box Substitution ---
+Split XOR result into two 4-bit halves
+S1 Input: 0000
+S1 Row Bits : 00 → Decimal 0
+S1 Column Bits : 00 → Decimal 0
+S1 Lookup Value: 0
+S1 Output (Binary): 00
+S2 Input: 0010
+S2 Row Bits : 00 → Decimal 0
+S2 Column Bits : 01 → Decimal 1
+S2 Lookup Value: 1
+S2 Output (Binary): 01
+Combined S-Box Output (4 bits): 0001
+--- Permutation (P) ---
+Rearranging S-box output using P table
+P Table: [2, 4, 3, 1]
+P Output: 0100
+--- Feistel Function ---
+New Right = L XOR f(R)
+L3 : 0001
+f(R3) : 0100
+L3 XOR f(R3) = 0101
+--- Swap Operation ---
+Left and Right halves are swapped
+L4 = 1000
+R4 = 0101
+FINAL PERMUTATION
+IP Inverse Table: [4, 1, 3, 5, 7, 2, 8, 6]
+Preoutput (R4 + L4): 01011000
+Final Ciphertext: 10010100

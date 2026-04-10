@@ -1,0 +1,83 @@
+from flask import Flask, request, jsonify, render_template
+from flask_cors import CORS
+app = Flask(__name__)
+CORS(app)
+# ================= HOME =================
+@app.route("/")
+def home():
+return render_template("index.html")
+# ================= PRIMALITY TEST =================
+def primality_test(n):
+steps = ""
+if n <= 1:
+return "Not Prime", "Number must be > 1"
+for i in range(2, int(n**0.5) + 1):
+steps += f"Check: {n} % {i} = {n % i}\n"
+if n % i == 0:
+steps += f"{n} is divisible by {i}\n"
+return "Not Prime", steps
+steps += f"No divisors found → {n} is Prime\n"
+return "Prime", steps
+@app.route("/primality", methods=["POST"])
+def primality():
+data = request.json
+n = int(data["number"])
+result, steps = primality_test(n)
+print("\n--- PRIMALITY TEST STEPS ---")
+print(steps)
+return jsonify({
+"result": result,
+"steps": steps
+})
+# ================= EUCLIDEAN GCD =================
+def euclidean_gcd(a, b):
+steps = ""
+while b != 0:
+steps += f"{a} = {b} × ({a // b}) + {a % b}\n"
+a, b = b, a % b
+steps += f"GCD = {a}\n"
+return a, steps
+@app.route("/gcd", methods=["POST"])
+def gcd():
+data = request.json
+a = int(data["a"])
+b = int(data["b"])
+result, steps = euclidean_gcd(a, b)
+print("\n--- EUCLIDEAN ALGORITHM STEPS ---")
+print(steps)
+return jsonify({
+"result": str(result),
+"steps": steps
+})
+if __name__ == "__main__":
+app.run(debug=True)
+===============================
+TEST CASE – PRIMALITY TEST
+===============================
+Operation: Primality Test
+Input: 29
+Checking whether 29 is prime
+Check divisibility from 2 to √29
+Steps:
+29 % 2 = 1
+29 % 3 = 2
+29 % 4 = 1
+29 % 5 = 4
+No divisors found → 29 is PRIME
+===============================
+TEST CASE – EUCLIDEAN GCD
+===============================
+Operation: Euclidean GCD
+a = 98
+b = 56
+Step 1:
+98 = 56 × (98 / 56) + 42
+98 = 56 × 1 + 42
+Step 2:
+56 = 42 × (56 / 42) + 14
+56 = 42 × 1 + 14
+Step 3:
+42 = 14 × (42 / 14) + 0
+42 = 14 × 3 + 0
+Since remainder = 0,
+GCD = 14

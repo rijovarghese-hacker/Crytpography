@@ -1,0 +1,221 @@
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+app = Flask(__name__)
+CORS(app)
+# ================= SHIFT =================
+def shift_encrypt(text, key):
+result = ""
+steps = ""
+for i, ch in enumerate(text):
+if ch.isalpha():
+base = 'a' if ch.islower() else 'A'
+original = ord(ch) - ord(base)
+shifted = (original + key) % 26
+new_char = chr(shifted + ord(base))
+result += new_char
+steps += f"Step {i+1}: {ch} -> ({original}+{key}) mod 26 =
+{new_char}\n"
+else:
+result += ch
+return result, steps
+def shift_decrypt(text, key):
+result = ""
+steps = ""
+for i, ch in enumerate(text):
+if ch.isalpha():
+base = 'a' if ch.islower() else 'A'
+original = ord(ch) - ord(base)
+shifted = (original - key) % 26
+new_char = chr(shifted + ord(base))
+result += new_char
+steps += f"Step {i+1}: {ch} -> ({original}-{key}) mod 26 =
+{new_char}\n"
+else:
+result += ch
+return result, steps
+# ================= VIGENERE =================
+def vigenere_encrypt(text, key):
+result = ""
+steps = ""
+j = 0
+key = key.lower()
+for i, ch in enumerate(text):
+if ch.isalpha():
+base = 'a' if ch.islower() else 'A'
+p = ord(ch) - ord(base)
+k = ord(key[j % len(key)]) - ord('a')
+c = (p + k) % 26
+new_char = chr(c + ord(base))
+result += new_char
+steps += f"Step {j+1}: ({ch}+{key[j%len(key)]}) -> {new_char}\n"
+j += 1
+else:
+result += ch
+return result, steps
+def vigenere_decrypt(text, key):
+result = ""
+steps = ""
+j = 0
+key = key.lower()
+for i, ch in enumerate(text):
+if ch.isalpha():
+base = 'a' if ch.islower() else 'A'
+c = ord(ch) - ord(base)
+k = ord(key[j % len(key)]) - ord('a')
+p = (c - k) % 26
+new_char = chr(p + ord(base))
+result += new_char
+steps += f"Step {j+1}: ({ch}-{key[j%len(key)]}) -> {new_char}\n"
+j += 1
+else:
+result += ch
+return result, steps
+# ================= HILL =================
+def hill_encrypt(text, key):
+text = ''.join(filter(str.isalpha, text)).upper()
+if len(text) % 2 != 0:
+text += 'X'
+k = list(map(int, key.split()))
+if len(k) != 4:
+return "", "Key must have 4 numbers"
+result = ""
+steps = ""
+for i in range(0, len(text), 2):
+p1 = ord(text[i]) - 65
+p2 = ord(text[i+1]) - 65
+c1 = (k[0]*p1 + k[1]*p2) % 26
+c2 = (k[2]*p1 + k[3]*p2) % 26
+result += chr(c1 + 65) + chr(c2 + 65)
+steps += f"Block {i//2+1}: [{text[i]} {text[i+1]}] -> [{result[-2]}
+{result[-1]}]\n"
+return result, steps
+def hill_decrypt(text, key):
+k = list(map(int, key.split()))
+if len(k) != 4:
+return "", "Key must have 4 numbers"
+det = (k[0]*k[3] - k[1]*k[2]) % 26
+# find modular inverse
+inv = -1
+for i in range(26):
+if (det * i) % 26 == 1:
+inv = i
+if inv == -1:
+return "", "Key not invertible"
+inv_key = [
+( k[3]*inv) % 26,
+(-k[1]*inv) % 26,
+(-k[2]*inv) % 26,
+( k[0]*inv) % 26
+]
+result = ""
+steps = ""
+for i in range(0, len(text), 2):
+c1 = ord(text[i]) - 65
+c2 = ord(text[i+1]) - 65
+p1 = (inv_key[0]*c1 + inv_key[1]*c2) % 26
+p2 = (inv_key[2]*c1 + inv_key[3]*c2) % 26
+result += chr(p1 + 65) + chr(p2 + 65)
+steps += f"Block {i//2+1}: [{text[i]} {text[i+1]}] -> [{result[-2]}
+{result[-1]}]\n"
+return result, steps
+# ================= ROUTES =================
+@app.route("/<cipher>/<mode>", methods=["POST"])
+def run(cipher, mode):
+data = request.json
+text = data["text"]
+key = data["key"]
+if cipher == "shift":
+key = int(key)
+func = shift_encrypt if mode == "encrypt" else shift_decrypt
+elif cipher == "vigenere":
+func = vigenere_encrypt if mode == "encrypt" else vigenere_decrypt
+elif cipher == "hill":
+func = hill_encrypt if mode == "encrypt" else hill_decrypt
+else:
+return jsonify({"result": "", "steps": "Invalid cipher"})
+result, steps = func(text, key)
+return jsonify({"result": result, "steps": steps})
+if __name__ == "__main__":
+app.run(debug=True)
+TEST CASE - 1: SHIFT CIPHER
+Encryption:
+Plaintext: hi hello how are you?
+Key: k = 5
+Formula:
+Y = (X + k) mod 26
+Steps:
+h = (7+5)=12 = m
+i = (8+5)=13 = n
+h = m
+e = (4+5)=9 = j
+l = (11+5)=16 = q
+l = q
+o = (14+5)=19 = t
+h = m
+o = t
+w = (22+5)=27 mod 26 = 1 = b
+a = (0+5)=5 = f
+r = (17+5)=22 = w
+e = (4+5)=9 = j
+y = (24+5)=29 mod 26 = 3 = d
+o = t
+u = (20+5)=25 = z
+Cipher Text:
+mn mjqqt mtb fwj dtz
+Decryption:
+Formula:
+X = (Y - k) mod 26
+m = (12-5)=7 = h
+n = (13-5)=8 = i
+m = h
+j = (9-5)=4 = e
+q = (16-5)=11 = l
+q = l
+t = (19-5)=14 = o
+m = h
+t = o
+b = (1-5)=-4 mod 26 = 22 = w
+f = (5-5)=0 = a
+w = (22-5)=17 = r
+j = (9-5)=4 = e
+d = (3-5)=-2 mod 26 = 24 = y
+t = o
+z = (25-5)=20 = u
+Recovered Plaintext:
+hi hello how are you
+===============================
+TEST CASE - 2: VIGENERE CIPHER
+===============================
+Encryption:
+Plaintext: hihellohowareyou
+Key: KEY
+Key values:K = 10, E = 4, Y = 24
+Repeated Key:KEYKEYKEYKEYKEY
+Formula:
+Ci = (Pi + Ki) mod 26
+Cipher Text:
+rmfopjyqmg epobme
+Decryption:
+Formula:
+Pi = (Ci - Ki) mod 26
+Recovered Plaintext:
+hihellohowareyou
+TEST CASE – 3: HILL CIPHER
+Encryption: Plaintext: code
+Key Matrix: |2 3| |3 5|
+Letter values: c = 2, o = 14 d = 3, e = 4
+Formula: C = K * P mod 26
+Step 1: |2 3| |2 | |(22 + 314)| |3 5| * |14| = |(32
++ 514)|
+= |4 + 42| = 46 |6 + 70| = 76
+mod 26: 46 mod 26 = 20 = u 76 mod 26 = 24 =
+y
+Step 2: |2 3| |3| |(23 + 34)| |3 5| * |4| = |(33 +
+54)|
+= |6 + 12| = 18 = s |9 + 20| = 29 mod 26 = 3 = d
+Cipher Text: uysd
+Decryption:
+Inverse Key Matrix: K_inv = inv(K) mod 26
+K_inv = |5 23| |23 2|
+Formula: P = K_inv * C mod 26
+Recovered Plaintext: code

@@ -1,0 +1,615 @@
+if __name__ == '__main__':
+app.run(debug=True)
+from flask import Flask, render_template, request
+app = Flask(__name__)
+rcon = [1,2,4,8,16,32,64,128,27,54]
+def pad(text):
+b = text.e ncode()
+return (b + b' '*16)[:16]
+def state_from_bytes(b):
+return [[b[i + 4*j] for j in range(4)] for i in range(4)]
+def print_state(state):
+return " n".join(str(r) for r in state)
+def rot_word(word):
+return word[1:] + word[:1]
+def sub_word
+(
+return [sbox[b] for b in word]
+def key_expansion(key, rounds):
+console = " n====== KEY EXPANSION ====== n"
+key_bytes = list(pad(key))
+words = [key_bytes[i:i+4] for i in range(0,16,4)]
+console += "Initial Words n"
+for i,w in enumerate(words):
+console += f"W{i} : {w} n"
+all_words = words.copy()
+for i in range(4, 4*(rounds+1)):
+temp = all_words[i 1].copy()
+console += f" nGenerating W{i} n"
+if i % 4 == 0:if i % 4 == 0:
+console += "RotWordconsole += "RotWord\\n"n"
+temp = rot_word(temp)temp = rot_word(temp)
+console += str(temp) + "console += str(temp) + "\\n"n"
+console += "SubWordconsole += "SubWord\\n"n"
+temp = sub_word(temp)temp = sub_word(temp)
+console += str(temp) + "console += str(temp) + "\\n"n"
+r_index = (i//4) r_index = (i//4) -- 11
+if r_index < len(rcon):if r_index < len(rcon):
+console += "Rcon XORconsole += "Rcon XOR\\n"n"
+temp[0] ^= rcon[r_index]temp[0] ^= rcon[r_index]
+console += str(temp) + "console += str(temp) + "\\n"n"
+new = [a ^ b for a,b in zip(all_words[inew = [a ^ b for a,b in
+zip(all_words[i--4], temp)]4], temp)]
+console += f"W{i} = W{iconsole += f"W{i} = W{i--4} XOR te4} XOR tempmp\\n"n"
+console += str(new) + "console += str(new) + "\\n"n"
+all_words.append(new)all_words.append(new)
+round_keys = []round_keys = []
+for r in range(rounds+1):for r in range(rounds+1):
+key_block = []key_block = []
+for i in range(4):for i in range(4):
+key_block += all_words[4*r+i]key_block += all_words[4*r+i]
+round_keys.append(state_from_bytes(bytes(key_block)))round_keys.append(state_fro
+m_bytes(bytes(key_block)))
+return round_keys, consolereturn round_keys, console
+def add_round_key(state,key):
+def add_round_key(state,key):
+for r in range(4):for r in range(4):
+for c in range(4):for c in range(4):
+state[r][c] ^= key[r][c]state[r][c] ^= key[r][c]
+def sub_bytes(state):
+def sub_bytes(state):
+for r in range(4):for r in range(4):
+for c in range(4):for c in range(4):
+value = state[r][c] % 256value = state[r][c] % 256
+state[r][c] = sbox[value]state[r][c] = sbox[value]
+def shift_rows(state):
+def shift_rows(state):
+state[1] = state[1][1:] + state[1][:1]state[1] = state[1][1:] + state[1][:1]
+state[2] = state[2][2:] + state[2][:2]state[2] = state[2][2:] + state[2][:2]
+state[3] = state[3][3:] + state[3][:3]state[3] = state[3][3:] + state[3][:3]
+de
+def mix_columns(state):f mix_columns(state):
+for col in range(4):for col in range(4):
+a = state[0][col] % 256a = state[0][col] % 256
+b = state[1][col] % 256b = state[1][col] % 256
+c = state[2][col] % 256c = state[2][col] % 256
+d = state[3][col] % 256d = state[3][col] % 256
+state[0][col] = (a ^ b) % 256state[0][col] = (a ^ b) % 256
+state[1][col] = (b ^ c) % 256state[1][col] = (b ^ c) % 256
+state[2][col] = (c ^ d) % 256state[2][col] = (c ^ d) % 256
+state[3][col] = (d ^ a) % 256state[3][col] = (d ^ a) % 256
+def cipher_text(state):
+def cipher_text(state):
+res = ""res = ""
+for c in range(4):for c in range(4):
+for r in range(4):for r in range(4):
+res += chr((state[r][c] % 26) + 65)res += chr((state[r][c] % 26) + 65)
+return resreturn res
+@app.route("/",
+@app.route("/", methods=["GET","POST"])methods=["GET","POST"])
+def index():
+def index():
+console = ""console = ""
+if request.method == "POST":if request.method == "POST":
+pt = request.form.get("plaintext","")pt = request.form.get("plaintext","")
+key = request.form.get("key","")key = request.form.get("key","")
+rounds_input = request.form.get("rounds","0")rounds_input =
+request.form.get("rounds","0")
+if rounds_input.isdigif rounds_input.isdigit():it():
+rounds = int(rounds_input)rounds = int(rounds_input)
+else:else:
+rounds = 0rounds = 0
+if rounds > 10:if rounds > 10:
+rounds = 10rounds = 10
+console += "AES supports maximum 10 rounds. Using 10.console += "AES supports
+maximum 10 rounds. Using 10.\\nn\\n"n"
+padded = pad(pt)padded = pad(pt)
+state = state_from_bystate = state_from_bytes(padded)tes(padded)
+console += "PLAINTEXT ASCIIconsole += "PLAINTEXT ASCII\\n"n"
+console += str(list(padded)) + "console += str(list(padded)) + "\\nn\\n"n"
+console += "INITIAL STATEconsole += "INITIAL STATE\\n"n"
+console += print_state(state) + "console += print_state(state) + "\\nn\\n"n"
+round_keys, key_console = key_expansion(key, rounds)round_keys, key_console =
+key_expansion(key, rounds)
+consolconsole += key_console + "e += key_console + "\\n"n"
+for i,k in enumerate(round_keys):for i,k in enumerate(round_keys):
+console += f"console += f"\\nROUND KEY {i}nROUND KEY {i}\\n"n"
+console += print_state(k) + "console += print_state(k) + "\\n"n"
+add_round_key(state, round_keys[0])add_round_key(state, round_keys[0])
+console += "console += "\\nAfter Initial AddRoundKeynAfter Initial AddRoundKey\
+\n"n"
+console += print_state(state) + "console += print_state(state) + "\\n"n"
+for r in range(1, rounds+1):for r in range(1, rounds+1):
+console += f"console += f"\\n===== ROUND {r} =====n===== ROUND {r} =====\\n"n"
+sub_bytes(state)sub_bytes(state)
+console += "SubBytesconsole += "SubBytes\\n"n"
+console += print_state(state) + "console += print_state(state) + "\\n"n"
+shift_rows(state)shift_rows(state)
+console += "ShiftRowsconsole += "ShiftRows\\n"n"
+console += print_state(state) + "console += print_state(state) + "\\n"n"
+mix_columns(state)mix_columns(state)
+console += "MixColumnsconsole += "MixColumns\\n"n"
+console += print_state(state) + "console += print_state(state) + "\\n"n"
+add_round_key(stateadd_round_key(state, round_keys[r]), round_keys[r])
+console += "AddRoundKeyconsole += "AddRoundKey\\n"n"
+console += print_state(state) + "console += print_state(state) + "\\n"n"
+console += "console += "\\nFINAL CIPHERnFINAL CIPHER\\n"n"
+console += cipher_text(state)console += cipher_text(state)
+return render_template("aes.html", console=console)return
+render_template("aes.html", console=console)
+return render_template("aes.html", console="")return render_template("aes.html",
+console="")
+if __name__ == "__main__":
+if __name__ == "__main__":
+app.run(debug=True)app.run(debug=True)
+
+PT: exampl
+KEY: examl123
+ROUNDS:10
+PLAINTEXT ASCII
+[116, 104, 97, 114, 117, 110, 32, 32, 32, 32, 32,
+32, 32, 32, 32, 32]
+INITIAL STATE
+[116, 117, 32, 32]
+[104, 110, 32, 32]
+[97, 32, 32, 32]
+[114, 32, 32, 32]
+====== KEY EXPANSION ======
+Initial Words
+W0 : [116, 104, 97, 114]
+W1 : [117, 110, 49, 50]
+W2 : [51, 32, 32, 32]
+W3 : [32, 32, 32, 32]
+Generating W4
+RotWord
+[32, 32, 32, 32]
+SubWord
+[183, 183, 183, 183]
+Rcon XOR
+[182, 183, 183, 183]
+W4 = W0 XOR temp
+[194, 223, 214, 197]
+Generating W5
+W5 = W1 XOR temp
+[183, 177, 231, 247]
+Generating W6
+W6 = W2 XOR temp
+[132, 145, 199, 215]
+Generating W7
+W7 = W3 XOR temp
+[164, 177, 231, 247]
+Generating W8
+RotWord
+[177, 231, 247, 164]
+SubWord
+[200, 148, 104, 73]
+Rcon XOR
+[202, 148, 104, 73]
+W8 = W4 XOR temp
+[8, 75, 190, 140]
+Generating W9
+W9 = W5 XOR temp
+[191, 250, 89, 123]
+Generating W10
+W10 = W6 XOR temp
+[59, 107, 158, 172]
+Generating W11
+W11 = W7 XOR temp
+[159, 218, 121, 91]
+Generating W12
+RotWord
+[218, 121, 91, 159]
+SubWord
+[87, 182, 57, 219]
+Rcon XOR
+[83, 182, 57, 219]
+W12 = W8 XOR temp
+[91, 253, 135, 87]
+Generating W13
+W13 = W9 XOR temp
+[228, 7, 222, 44]
+Generating W14
+W14 = W10 XOR temp
+[223, 108, 64, 128]
+Generating W15
+W15 = W11 XOR temp
+[64, 182, 57, 219]
+Generating W16
+RotWord
+[182, 57, 219, 64]
+SubWord
+[78, 18, 185, 9]
+Rcon XOR
+[70, 18, 185, 9]
+W16 = W12 XOR temp
+[29, 239, 62, 94]
+Generating W17
+W17 = W13 XOR temp
+[249, 232, 224, 114]
+Generating W18
+W18 = W14 XOR temp
+[38, 132, 160, 242]
+Generating W19
+W19 = W15 XOR temp
+[102, 50, 153, 41]
+Generating W20
+RotWord
+[50, 153, 41, 102]
+SubWord
+[35, 238, 165, 51]
+Rcon XOR
+[51, 238, 165, 51]
+W20 = W16 XOR temp
+[46, 1, 155, 109]
+Generating W21
+W21 = W17 XOR temp
+[215, 233, 123, 31]
+Generating W22
+W22 = W18 XOR temp
+[241, 109, 219, 237]
+Generating W23
+W23 = W19 XOR temp
+[151, 95, 66, 196]
+Generating W24
+RotWord
+[95, 66, 196, 151]
+SubWord
+[207, 44, 28, 136]
+Rcon XOR
+[239, 44, 28, 136]
+W24 = W20 XOR temp
+[193, 45, 135, 229]
+Generating W25
+W25 = W21 XOR temp
+[22, 196, 252, 250]
+Generating W26
+W26 = W22 XOR temp
+[231, 169, 39, 23]
+Generating W27
+W27 = W23 XOR temp
+[112, 246, 101, 211]
+Generating W28
+RotWord
+[246, 101, 211, 112]
+SubWord
+[66, 77, 102, 81]
+Rcon XOR
+[2, 77, 102, 81]
+W28 = W24 XOR temp
+[195, 96, 225, 180]
+Generating W29
+W29 = W25 XOR temp
+[213, 164, 29, 78]
+Generating W30
+W30 = W26 XOR temp
+[50, 13, 58, 89]
+Generating W31
+W31 = W27 XOR temp
+[66, 251, 95, 138]
+Generating W32
+RotWord
+[251, 95, 138, 66]
+SubWord
+[15, 207, 126, 44]
+Rcon XOR
+[143, 207, 126, 44]
+W32 = W28 XOR temp
+[76, 175, 159, 152]
+Generating W33
+W33 = W29 XOR temp
+[153, 11, 130, 214]
+Generating W34
+W34 = W30 XOR temp
+[171, 6, 184, 143]
+Generating W35
+W35 = W31 XOR temp
+[233, 253, 231, 5]
+Generating W36
+RotWord
+[253, 231, 5, 233]
+SubWord
+[84, 148, 107, 30]
+Rcon XOR
+[79, 148, 107, 30]
+W36 = W32 XOR temp
+[3, 59, 244, 134]
+Generating W37
+W37 = W33 XOR temp
+[154, 48, 118, 80]
+Generating W38
+W38 = W34 XOR temp
+[49, 54, 206, 223]
+Generating W39
+W39 = W35 XOR temp
+[216, 203, 41, 218]
+Generating W40
+RotWord
+[203, 41, 218, 216]
+SubWord
+[31, 165, 87, 97]
+Rcon XOR
+[41, 165, 87, 97]
+W40 = W36 XOR temp
+[42, 158, 163, 231]
+Generating W41
+W41 = W37 XOR temp
+[176, 174, 213, 183]
+Generating W42
+W42 = W38 XOR temp
+[129, 152, 27, 104]
+Generating W43
+W43 = W39 XOR temp
+[89, 83, 50, 178]
+ROUND KEY 0
+[116, 117, 51, 32]
+[104, 110, 32, 32]
+[97, 49, 32, 32]
+[114, 50, 32, 32]
+ROUND KEY 1
+[194, 183, 132, 164]
+[223, 177, 145, 177]
+[214, 231, 199, 231]
+[197, 247, 215, 247]
+ROUND KEY 2
+[8, 191, 59, 159]
+[75, 250, 107, 218]
+[190, 89, 158, 121]
+[140, 123, 172, 91]
+ROUND KEY 3
+[91, 228, 223, 64]
+[253, 7, 108, 182]
+[135, 222, 64, 57]
+[87, 44, 128, 219]
+ROUND KEY 4
+[29, 249, 38, 102]
+[239, 232, 132, 50]
+[62, 224, 160, 153]
+[94, 114, 242, 41]
+ROUND KEY 5
+[46, 215, 241, 151]
+[1, 233, 109, 95]
+[155, 123, 219, 66]
+[109, 31, 237, 196]
+ROUND KEY 6
+[193, 22, 231, 112]
+[45, 196, 169, 246]
+[135, 252, 39, 101]
+[229, 250, 23, 211]
+ROUND KEY 7
+[195, 213, 50, 66]
+[96, 164, 13, 251]
+[225, 29, 58, 95]
+[180, 78, 89, 138]
+ROUND KEY 8
+[76, 153, 171, 233]
+[175, 11, 6, 253]
+[159, 130, 184, 231]
+[152, 214, 143, 5]
+ROUND KEY 9
+[3, 154, 49, 216]
+[59, 48, 54, 203]
+[244, 118, 206, 41]
+[134, 80, 223, 218]
+ROUND KEY 10
+[42, 176, 129, 89]
+[158, 174, 152, 83]
+[163, 213, 27, 50]
+[231, 183, 104, 178]
+After Initial AddRoundKey
+[0, 0, 19, 0]
+[0, 0, 0, 0]
+[0, 17, 0, 0]
+[0, 18, 0, 0]
+===== ROUND 1 =====
+SubBytes
+[99, 99, 125, 99]
+[99, 99, 99, 99]
+[99, 130, 99, 99]
+[99, 201, 99, 99]
+ShiftRows
+[99, 99, 125, 99]
+[99, 99, 99, 99]
+[99, 99, 99, 130]
+[99, 99, 201, 99]
+MixColumns
+[0, 0, 30, 0]
+[0, 0, 0, 225]
+[0, 0, 170, 225]
+[0, 0, 180, 0]
+AddRoundKey
+[194, 183, 154, 164]
+[223, 177, 145, 80]
+[214, 231, 109, 6]
+[197, 247, 99, 247]
+===== ROUND 2 =====
+SubBytes
+[37, 169, 184, 73]
+[158, 200, 129, 83]
+[246, 148, 60, 111]
+[166, 104, 251, 104]
+ShiftRows
+[37, 169, 184, 73]
+[200, 129, 83, 158]
+[60, 111, 246, 148]
+[104, 166, 104, 251]
+MixColumns
+[237, 40, 235, 215]
+[244, 238, 165, 10]
+[84, 201, 158, 111]
+[77, 15, 208, 178]
+AddRoundKey
+[229, 151, 208, 72]
+[191, 20, 206, 208]
+[234, 144, 0, 22]
+[193, 116, 124, 233]
+===== ROUND 3 =====
+SubBytes
+[253, 254, 68, 135]
+[217, 136, 112, 82]
+[8, 250, 139, 112]
+[135, 96, 99, 71]
+[120, 146, 16, 30]
+ShiftRows
+[217, 136, 112, 82]
+[250, 139, 112, 8]
+[99, 71, 135, 96]
+[30, 120, 146, 16]
+MixColumns
+[35, 3, 0, 90]
+[153, 204, 247, 104]
+[125, 63, 21, 112]
+[199, 240, 226, 66]
+AddRoundKey
+[120, 231, 223, 26]
+[100, 203, 155, 222]
+[250, 225, 85, 73]
+[144, 220, 98, 153]
+===== ROUND 4 =====
+SubBytes
+[188, 148, 158, 162]
+[67, 31, 20, 29]
+[45, 248, 252, 59]
+[96, 134, 170, 238]
+ShiftRows
+[188, 148, 158, 162]
+[31, 20, 29, 67]
+[252, 59, 45, 248]
+[238, 96, 134, 170]
+MixColumns
+[163, 128, 131, 225]
+[227, 47, 48, 187]
+[18, 91, 171, 82]
+[82, 244, 24, 8]
+AddRoundKey
+[190, 121, 165, 135]
+[12, 199, 180, 137]
+[44, 187, 11, 203]
+[12, 134, 234, 33]
+===== ROUND 5 =====
+SubBytes
+[174, 182, 6, 23]
+[254, 198, 141, 167]
+[113, 234, 43, 31]
+[254, 68, 135, 253]
+ShiftRows
+[174, 182, 6, 23]
+[198, 141, 167, 254]
+[43, 31, 113, 234]
+[253, 254, 68, 135]
+MixColumns
+[104, 59, 161, 233]
+[237, 146, 214, 20]
+[214, 225, 53, 109]
+[83, 72, 66, 144]
+AddRoundKey
+[70, 236, 80, 126]
+[236, 123, 187, 75]
+[77, 154, 238, 47]
+[62, 87, 175, 84]
+===== ROUND 6 =====
+SubBytes
+[90, 206, 83, 243]
+[206, 33, 234, 179]
+[227, 184, 40, 21]
+[178, 91, 121, 32]
+ShiftRows
+[90, 206, 83, 243]
+[33, 234, 179, 206]
+[40, 21, 227, 184]
+[32, 178, 91, 121]
+MixColumns
+[123, 36, 224, 61]
+[9, 255, 80, 118]
+[8, 167, 184, 193]
+[122, 124, 8, 138]
+AddRoundKey
+[186, 50, 7, 77]
+[36, 59, 249, 128]
+[143, 91, 159, 164]
+[159, 134, 31, 89]
+===== ROUND 7 =====
+SubBytes
+[244, 35, 197, 227]
+[54, 226, 153, 205]
+[115, 57, 219, 73]
+[219, 68, 192, 203]
+ShiftRows
+[244, 35, 197, 227]
+[226, 153, 205, 54]
+[219, 73, 115, 57]
+[203, 219, 68, 192]
+MixColumns
+[22, 186, 8, 213]
+[57, 208, 190, 15]
+[16, 146, 55, 249]
+[63, 248, 129, 35]
+AddRoundKey
+[213, 111, 58, 151]
+[89, 116, 179, 244]
+[241, 143, 13, 166]
+[139, 182, 216, 169]
+===== ROUND 8 =====
+SubBytes
+[3, 168, 128, 136]
+[203, 146, 109, 191]
+[161, 115, 215, 36]
+[61, 78, 97, 211]
+ShiftRows
+[3, 168, 128, 136]
+[146, 109, 191, 203]
+[215, 36, 161, 115]
+[211, 61, 78, 97]
+MixColumns
+[145, 197, 63, 67]
+[69, 73, 30, 184]
+[4, 25, 239, 18]
+[208, 149, 206, 233]
+AddRoundKey
+[221, 92, 148, 170]
+[234, 66, 24, 69]
+[155, 155, 87, 245]
+[72, 67, 65, 236]
+===== ROUND 9 =====
+SubBytes
+[193, 74, 34, 172]
+[135, 44, 173, 110]
+[20, 20, 91, 230]
+[82, 26, 131, 206]
+ShiftRows
+[193, 74, 34, 172]
+[44, 173, 110, 135]
+[91, 230, 20, 20]
+[206, 82, 26, 131]
+MixColumns
+[237, 231, 76, 43]
+[119, 75, 122, 147]
+[149, 180, 14, 151]
+[15, 24, 56, 47]
+AddRoundKey
+[238, 125, 125, 243]
+[76, 123, 76, 88]
+[97, 194, 192, 190]
+[137, 72, 231, 245]
+===== ROUND 10 =====
+SubBytes
+[40, 255, 255, 13]
+[41, 33, 41, 106]
+[239, 37, 186, 174]
+[167, 82, 148, 230]
+ShiftRows
+[40, 255, 255, 13]
+[33, 41, 106, 41]
+[186, 174, 239, 37]
+[230, 167, 82, 148]
+MixColumns
+[9, 214, 149, 36]
+[155, 135, 133, 12]
+[92, 9, 189, 177]
+[206, 88, 173, 153]
+AddRoundKey
+[35, 102, 20, 125]
+[5, 41, 29, 95]
+[255, 220, 166, 131]
+[41, 239, 197, 43]
+FINAL CIPHER
+JFVPYPMFUDKPVRBR
