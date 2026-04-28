@@ -1,0 +1,235 @@
+Snort IDS/IPS 
+Commands & Rules Reference for Windows
+
+PART A: Installation & Initial Configuration
+
+Step 1: Install Prerequisites
+Update the system and install all required dependencies before compiling Snort.
+sudo apt-get update && sudo apt-get upgrade -y
+sudo apt-get install -y build-essential libpcap-dev libpcre3-dev \
+ libnet1-dev zlib1g-dev luajit hwloc libdnet-dev libdumbnet-dev \
+ bison flex liblzma-dev openssl libssl-dev pkg-config \
+ libhwloc-dev cmake cpputest libsqlite3-dev uuid-dev \
+ libcmocka-dev libnetfilter-queue-dev libmnl-dev autotools-dev \
+ libluajit-5.1-dev libunwind-dev libfl-dev
+
+Step 2: Install Snort DAQ (Data Acquisition Library)
+Snort 3 requires the DAQ library to capture packets from network interfaces.
+cd /tmp
+git clone https://github.com/snort3/libdaq.git
+cd libdaq
+./bootstrap
+./configure
+make
+sudo make install
+sudo ldconfig
+
+Step 3: Install Snort 3
+Download and compile Snort 3 from source.
+cd /tmp
+git clone https://github.com/snort3/snort3.git
+cd snort3
+./configure_cmake.sh --prefix=/usr/local --enable-tcmalloc
+cd build
+make -j$(nproc)
+sudo make install 
+sudo ldconfig
+
+Verify Installation
+
+snort -V
+This should display the Snort version, confirming a successful installation
+
+Step 4: Identify and Configure the Network Interface
+Find your active network interface name. Common names are eth0, ens33, or wlan0.
+ip addr show
+ifconfig
+⚠ Note your interface name (e.g., eth0 or ens33). Replace <INTERFACE> in all commands below with 
+your actual interface name.
+Disable offloading features so Snort can inspect raw packets accurately:
+sudo ethtool -K <INTERFACE> gro off lro off
+Set the interface to promiscuous mode to capture all network traffic:
+sudo ip link set <INTERFACE> promisc on
+
+Step 5: Create Snort Directory Structure
+tep 5: Create Snort Directory Structure
+sudo mkdir -p /etc/snort/rules
+sudo mkdir -p /var/log/snort
+sudo mkdir -p /usr/local/lib/snort_dynamicrules
+Create the Main Configuration File
+Copy the default configuration and customize it:
+sudo cp /usr/local/etc/snort/snort.lua /etc/snort/snort.lua
+sudo cp /usr/local/etc/snort/snort_defaults.lua 
+/etc/snort/snort_defaults.lua
+
+1 Read packets from network interface using config 
+List interface first 
+snort -w 
+Start ids mode 
+snort -A console -i 1 -c C:\Snort\etc\snort.conf 
+:: -c Path to config file 
+-A console Print alerts to terminal
+
+2.Read packets from a PCAP file 
+snort -r C:\path\to\capture.pcap -c C:\Snort\etc\snort.conf -A console 
+:: -r Read from PCAP file (offline mode — no live interface needed)
+
+TASK 3 — Test Snort configuration file
+Validate config and all rules (no traffic captured): snort -T -c C:\Snort\etc\snort.conf 
+-T → Test mode — validates syntax of snort.conf and all included rules Look for: "Snort successfully 
+validated the configuration!" 
+Verbose test with interface: snort -T -i 1 -c C:\Snort\etc\snort.conf -v
+
+TASK 4 — Capture from interface and write to PCAP file
+Log captured packets in binary PCAP format: snort -i 1 -c C:\Snort\etc\snort.conf -l C:\Snort\log -b 
+-b → Binary (PCAP) logging mode -l → Log directory — creates snort.log.TIMESTAMP file Open the 
+.log file in Wireshark for analysis 
+Add this to snort.conf for explicit PCAP output: output log_tcpdump: C:\Snort\log\capture.pcap
+
+TASK 5 — Simple test rule — trigger any time
+Add to C:\Snort\rules\local.rules: alert icmp any any -> any any (msg:"TEST RULE - Snort is working!"; 
+sid:9000001; rev:1;) 
+Triggers on any ICMP (ping) traffic. Test by opening another CMD: ping 8.8.8.8 
+TCP test rule (HTTP traffic): alert tcp any any -> any 80 (msg:"TEST RULE - HTTP detected"; 
+sid:9000002; rev:1;) 
+Note: After adding rules — run Task 3 to validate, then Task 1 to start Snort, then ping 8.8.8.8 in 
+another window. You should see the alert in the console.
+
+TASK 6 — Print alerts to console
+Real-time alert output to terminal: snort -A console -q -i 1 -c C:\Snort\etc\snort.conf 
+-A console → Prints alerts live to the terminal 
+Other alert output modes: -A full → Full alert with packet headers → C:\Snort\log\alert -A fast → 
+One-line summary per alert → C:\Snort\log\alert -A none → No alerts output, logging only -A 
+console → Print to terminal in real Ɵme (best for learning) -A cmg → Combined console + full packet 
+header dump 
+Monitor alert log file in real-time (PowerShell): Get-Content C:\Snort\log\alert -Wait
+
+
+Task 7 :BPF filter at command line (append after all flags): 
+snort -i 1 -c C:\Snort\etc\snort.conf -A console "port 80" 
+snort -i 1 -c C:\Snort\etc\snort.conf -A console "src host 192.168.1.100" 
+snort -i 1 -c C:\Snort\etc\snort.conf -A console "tcp and port not 22" 
+BPF (Berkeley Packet Filter) syntax — same as Wireshark capture filters 
+Set monitored network scope in snort.conf: 
+var HOME_NET 192.168.1.0/24 # Your local network 
+var EXTERNAL_NET !$HOME_NET # Everything else 
+var HTTP_PORTS 80 # Ports to watch for HTTP 
+var HTTP_SERVERS $HOME_NET # Servers to monitor 
+Pass rule — tell Snort to ignore specific traffic: pass tcp 192.168.1.50 any -> any any (msg:"Ignore 
+host"; sid:9000010; rev:1;)
+
+TASK 8 — Perform network scanning attacks with Nmap (Windows) 
+Aggressive: nmap -A 192.168.1.1 — OS + version detection 
+Note: Run Nmap in a second CMD/PowerShell window while Snort is running in another. Replace 
+192.168.1.1 with your target IP. SYN Scan: nmap -sS 192.168.1.1 — Half-open stealth scan UDP Scan: 
+nmap -sU 192.168.1.1 — Probe UDP ports Ping Sweep: nmap -sP 192.168.1.0/24 — ICMP sweep of 
+subnet FIN Scan: nmap -sF 192.168.1.1 — FIN flag only NULL Scan: nmap -sN 192.168.1.1 — No flags 
+set XMAS Scan: nmap -sX 192.168.1.1 — FIN + URG + PSH flags TCP Connect: nmap -sT 192.168.1.1 
+— Full TCP handshake
+
+TASK 9 — Rules to detect scan types (SYN, UDP, PING, FIN, NULL, XMAS, TCP)
+Add all rules to C:\Snort\rules\local.rules: 
+# SYN Scan — half-open, only SYN flag set 
+alert tcp any any -> $HOME_NET any (msg:"SCAN SYN Stealth Scan Detected"; flags:S,12; 
+threshold:type both, track by_src, count 5, seconds 2; sid:9000020; rev:1;) 
+# UDP Scan 
+alert udp any any -> $HOME_NET any (msg:"SCAN UDP Scan Detected"; threshold:type both, track 
+by_src, count 10, seconds 2; sid:9000021; rev:1;) 
+# PING Sweep — ICMP Echo Request flood 
+alert icmp any any -> $HOME_NET any (msg:"SCAN PING Sweep Detected"; itype:8; threshold:type 
+both, track by_src, count 5, seconds 2; sid:9000022; rev:1;) 
+# FIN Scan — only FIN flag, no ACK/SYN 
+alert tcp any any -> $HOME_NET any (msg:"SCAN FIN Scan Detected"; flags:F,12; sid:9000023; 
+rev:1;) 
+# NULL Scan — no flags at all 
+alert tcp any any -> $HOME_NET any (msg:"SCAN NULL Scan Detected"; flags:0; sid:9000024; rev:1;) 
+# XMAS Scan — FIN + URG + PSH set 
+alert tcp any any -> $HOME_NET any (msg:"SCAN XMAS Tree Scan Detected"; flags:FPU,12; 
+sid:9000025; rev:1;) 
+# TCP Connect Scan 
+alert tcp any any -> $HOME_NET any (msg:"SCAN TCP Connect Scan Detected"; flags:A,12; 
+threshold:type both, track by_src, count 10, seconds 2; sid:9000026; rev:1;)
+
+TASK 10 — Execute Snort in IDS mode
+Full IDS mode — sniff, detect, and alert (no packet blocking): snort -A full -i 1 -c 
+C:\Snort\etc\snort.conf -l C:\Snort\log -q 
+-A full → Full alert with headers logged to C:\Snort\log\alert -l → Log directory for alerts and packet 
+logs 
+IDS with console output (best for learning and lab work): snort -A console -i 1 -c 
+C:\Snort\etc\snort.conf -l C:\Snort\log -q 
+View alerts in real time (PowerShell second window): Get-Content C:\Snort\log\alert -Wait 
+Note: IDS mode detects and logs but does NOT block traffic. Snort can also run as IPS (inline mode) 
+to drop packets, but that requires additional setup with WinDivert on Windows.
+
+TASK 11 — Alert on ICMP traffic to 8.8.8.8 (ping detection)
+Alert on any ICMP to 8.8.8.8 (Google DNS): alert icmp any any -> 8.8.8.8 any (msg:"ICMP Traffic to 
+Google DNS 8.8.8.8 Detected"; sid:9000030; rev:1;) 
+Specifically detect ping requests (Echo Request, type 8): alert icmp any any -> 8.8.8.8 any (msg:"PING 
+Request to 8.8.8.8 Detected"; itype:8; icode:0; sid:9000031; rev:1;) 
+Detect ping replies coming back from 8.8.8.8 (Echo Reply, type 0): alert icmp 8.8.8.8 any -> any any 
+(msg:"PING Reply from 8.8.8.8 Detected"; itype:0; icode:0; sid:9000032; rev:1;) 
+Note: itype:8 = ICMP Echo Request (ping sent), itype:0 = ICMP Echo Reply (ping response). Test by 
+running ping 8.8.8.8 in another CMD window while Snort is running.
+
+TASK 12 — Detect a simple HTTP GET request to a domain
+Detect GET request to example.com: alert tcp any any -> any 80 (msg:"HTTP GET Request to 
+example.com Detected"; flow:to_server,established; content:"GET"; http_method; 
+content:"example.com"; http_header; sid:9000040; rev:1;) 
+Detect GET to a specific URI path (e.g. /admin): alert tcp any any -> any 80 (msg:"HTTP GET to 
+/admin path detected"; flow:to_server,established; content:"GET"; http_method; content:"/admin"; 
+http_uri; sid:9000041; rev:1;) 
+Note: flow:to_server,established matches only active sessions going toward the server. 
+http_method, http_uri, http_header are Snort HTTP preprocessor modifiers — the http_inspect 
+preprocessor must be enabled in snort.conf.
+
+TASK 13 — Detect suspicious User-Agent strings
+# sqlmap SQL injection scanner 
+alert tcp any any -> any 80 (msg:"SUSPICIOUS User-Agent: sqlmap"; flow:to_server,established; 
+content:"sqlmap"; http_header; nocase; sid:9000050; rev:1;) 
+# Nikto web vulnerability scanner 
+alert tcp any any -> any 80 (msg:"SUSPICIOUS User-Agent: Nikto"; flow:to_server,established; 
+content:"Nikto"; http_header; nocase; sid:9000051; rev:1;) 
+# curl (common in automated scripts and attacks) 
+alert tcp any any -> any 80 (msg:"SUSPICIOUS User-Agent: curl"; flow:to_server,established; 
+content:"User-Agent: curl"; http_header; nocase; sid:9000052; rev:1;) 
+# Python requests library (common in recon scripts) 
+alert tcp any any -> any 80 (msg:"SUSPICIOUS User-Agent: python-requests"; 
+flow:to_server,established; content:"python-requests"; http_header; nocase; sid:9000053; rev:1;)
+
+TASK 14 — Detect web application vulnerabilities
+# SQL Injection — UNION SELECT or SELECT FROM in URI 
+alert tcp any any -> any 80 (msg:"ATTACK SQL Injection in URI"; flow:to_server,established; 
+content:"SELECT"; http_uri; nocase; pcre:"/UNION.*SELECT|SELECT.*FROM/Ui"; sid:9000060; rev:1;) 
+# XSS — script tag in request 
+alert tcp any any -> any 80 (msg:"ATTACK XSS Script Tag in Request"; flow:to_server,established; 
+content:"<script>"; http_uri; nocase; sid:9000061; rev:1;) 
+# Directory Traversal (path traversal) 
+alert tcp any any -> any 80 (msg:"ATTACK Directory Traversal Attempt"; flow:to_server,established; 
+content:"../"; http_uri; sid:9000062; rev:1;) 
+# Remote Code Execution — eval() in POST body 
+alert tcp any any -> any 80 (msg:"ATTACK Possible RCE - eval in POST"; flow:to_server,established; 
+content:"POST"; http_method; content:"eval("; http_client_body; nocase; sid:9000063; rev:1;) 
+# Command Injection — shell metacharacters in URI 
+alert tcp any any -> any 80 (msg:"ATTACK Command Injection Attempt"; flow:to_server,established; 
+content:"|3B|"; http_uri; sid:9000064; rev:1;) 
+Note: pcre: uses Perl-Compatible Regular Expressions. |3B| is the hex encoding of the semicolon (;) 
+character — a common command injection character. http_client_body matches POST request body 
+data.
+
+TASK 15 — Detect suspicious DNS queries 
+# Any DNS query (UDP port 53) alert udp any any -> any 53 (msg:"DNS Query Detected"; 
+content:"|01 00 00 01|"; offset:2; depth:4; sid:9000070; rev:1;) 
+ # DNS query for a suspicious domain name 
+ alert udp any any -> any 53 (msg:"SUSPICIOUS DNS Query for malware.com"; content:"malware"; 
+nocase; sid:9000071; rev:1;) 
+# DNS TXT record — possible DNS tunnelling 
+ alert udp any any -> any 53 (msg:"SUSPICIOUS DNS TXT Record - possible tunneling"; content:"|00 
+10|"; sid:9000072; rev:1;) 
+# DNS Zone Transfer (AXFR) via TCP port 53 
+ alert tcp any any -> any 53 (msg:"SUSPICIOUS DNS Zone Transfer Attempt AXFR"; content:"|00 FC|"; 
+sid:9000073; rev:1;) 
+ # Unusually high DNS query rate (possible DGA/beaconing) 
+alert udp any any -> any 53 (msg:"SUSPICIOUS High Rate DNS Queries - possible DGA"; 
+threshold:type both, track by_src, count 30, seconds 10; sid:9000074; rev:1;)
+
+
