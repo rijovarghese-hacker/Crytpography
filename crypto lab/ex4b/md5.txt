@@ -1,0 +1,55 @@
+MPLEMENTATION OF MD 5:
+from flask import Flask, render_template, request
+import hashlib
+app = Flask(__name__)
+def manual_md5(message):
+steps = []
+# STEP 1: Plain Text
+steps.append({ "name": "Plain Text", "data": message, "desc": ""
+})
+# STEP 2: Binary Conversion
+bits = ''.join(format(ord(c), '08b') for c in message)
+steps.append({ "name": "Binary", "data": bits, "desc": ""
+})
+# STEP 3: Padding
+orig_len = len(bits)
+bits += '1' while (len(bits) % 512) != 448:
+bits += '0' steps.append({ "name": "Padding", "data": f"Length after padding: {len(bits)}", "desc": ""
+})
+# STEP 4: Append Length (64-bit)
+bits += format(orig_len, '064b')
+steps.append({ "name": "Length Appended", "data": bits[-64:], "desc": ""
+})
+# STEP 5: Initialize Buffers
+A = 0x67452301
+B = 0xefcdab89
+C = 0x98badcfe
+D = 0x10325476
+steps.append({ "name": "Initial Buffers", "data": f"A={hex(A)} B={hex(B)} C={hex(C)} D={hex(D)}", "desc": ""
+})
+# STEP 6: Simulated 64 Rounds (demo purpose)
+rounds = []
+for i in range(64):
+A = (A + B) & 0xFFFFFFFF
+B = (B + C) & 0xFFFFFFFF
+C = (C + D) & 0xFFFFFFFF
+D = (D + A) & 0xFFFFFFFF
+rounds.append(f"Round {i+1}: A={hex(A)} B={hex(B)}")
+steps.append({ "name": "64 Rounds",
+"data": "\n".join(rounds), "desc": "MD5 compression rounds"
+})
+# FINAL HASH (real output)
+final_hash = hashlib.md5(message.encode()).hexdigest()
+steps.append({ "name": "Final MD5 Hash", "data": final_hash, "desc": ""
+})
+return steps
+@app.route('/', methods=['GET', 'POST'])
+def index():
+results = None
+if request.method == 'POST':
+msg = request.form.get('message')
+if msg:
+results = manual_md5(msg)
+return render_template('index.html', results=results)
+if __name__ == '__main__':
+app.run(debug=True)
